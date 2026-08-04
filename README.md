@@ -14,7 +14,7 @@
 [Quickstart](https://www.jopenagent.org/quickstart.html) ·
 [Examples](https://www.jopenagent.org/examples.html) ·
 [Docs](https://www.jopenagent.org/docs.html) ·
-[Design notes](DESIGN_NOTES.md)
+
 
 </div>
 
