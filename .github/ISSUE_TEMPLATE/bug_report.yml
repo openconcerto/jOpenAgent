@@ -1,0 +1,108 @@
+name: Bug report
+description: Something in jOpenAgent does not behave as documented
+labels: [bug]
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. 
+
+        A note before you file: a model producing a bad answer is usually a model
+        limitation rather than a framework bug. If the harness raised a
+        `GenerationException` after its retries, that is it working as designed. What
+        makes this a jOpenAgent bug is the harness itself misbehaving: wrong dispatch,
+        a binding failure on valid JSON, a hang, a leak, a wrong schema.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer
+      description: The smallest agent class and call that shows the problem.
+      render: java
+    validations:
+      required: true
+
+  - type: dropdown
+    id: strategy
+    attributes:
+      label: Strategy
+      options:
+        - PREDICT
+        - CODE_ACT
+        - TOOL_CALLING
+        - REFLEXION
+        - Not strategy-related
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: jOpenAgent version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: java
+    attributes:
+      label: JDK
+      description: Output of `java -version`
+      placeholder: "temurin 21.0.5"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - Windows
+        - macOS
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model and provider
+      description: Which model, through which client. Local servers count.
+      placeholder: "qwen3-coder-30b via OpenAiClient.forLmStudio"
+
+  - type: textarea
+    id: trace
+    attributes:
+      label: Trace
+      description: |
+        This is the single most useful thing you can attach. Register a
+        `JsonTraceExporter` (see `E06`) or run `E16`'s trace viewer, and paste the
+        span tree. Redact any prompt content you cannot share.
+      render: text
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack trace
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I compiled with `-parameters`
+          required: true
+        - label: If this involves `CODE_ACT`, I ran with `--add-modules jdk.jshell`
+        - label: I searched existing issues
+          required: true

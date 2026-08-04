@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+  jOpenAgent - Maven build.
+
+  Build:      mvn clean verify           (JDK 21+)
+  Install:    mvn clean install
+  Publish:    mvn clean deploy -Prelease (see MAVEN_CENTRAL.md)
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.jopenagent</groupId>
+  <artifactId>jopenagent</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>jOpenAgent</name>
+  <description>The agent harness for Java: an agent is a plain Java class, fields are state,
+    ordinary methods are deterministic capabilities, and @Generative methods are delegated to an LLM
+    at runtime. Typed structured output with repair, four reasoning strategies (predict, code-as-action,
+    tool-calling, reflexion), memory, skills, MCP, tracing, trace viewers and an eval harness.
+    Zero dependencies, JDK 21+.</description>
+  <url>https://www.jopenagent.org/</url>
+  <inceptionYear>2026</inceptionYear>
+
+  <organization>
+    <name>ILM Informatique</name>
+    <url>https://www.ilm-informatique.fr/</url>
+  </organization>
+
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <!-- Maven Central requires at least one developer entry with a real name. -->
+  <developers>
+    <developer>
+      <id>openconcerto</id>
+      <name>Guillaume Maillard</name>
+      <email>contact@ilm-informatique.fr</email>
+      <organization>ILM Informatique</organization>
+      <organizationUrl>https://www.ilm-informatique.fr/</organizationUrl>
+      <roles>
+        <role>maintainer</role>
+      </roles>
+      <timezone>Europe/Paris</timezone>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/openconcerto/jOpenAgent.git</connection>
+    <developerConnection>scm:git:git@github.com:openconcerto/jOpenAgent.git</developerConnection>
+    <url>https://github.com/openconcerto/jOpenAgent</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/openconcerto/jOpenAgent/issues</url>
+  </issueManagement>
+
+  <distributionManagement>
+    <site>
+      <id>jopenagent-site</id>
+      <url>https://www.jopenagent.org/</url>
+    </site>
+  </distributionManagement>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <maven.compiler.release>21</maven.compiler.release>
+
+    <!-- Reproducible builds: fixed timestamp for every entry in the produced jars.
+         Bump this to the release date on each release (UTC, ISO-8601). -->
+    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+
+    <!-- jdk.jshell is a tool module: it must be requested explicitly for
+         classpath code, at compile time, test time and javadoc time. -->
+    <jopenagent.addModules>--add-modules=jdk.jshell</jopenagent.addModules>
+
+    <junit.version>5.11.4</junit.version>
+
+    <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+    <maven.surefire.plugin.version>3.5.2</maven.surefire.plugin.version>
+    <maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
+    <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
+    <maven.javadoc.plugin.version>3.11.2</maven.javadoc.plugin.version>
+    <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
+    <maven.resources.plugin.version>3.3.1</maven.resources.plugin.version>
+    <maven.install.plugin.version>3.1.3</maven.install.plugin.version>
+    <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
+    <central.publishing.plugin.version>0.7.0</central.publishing.plugin.version>
+  </properties>
+
+  <!--
+    The framework itself has NO dependencies at all, and that is a design
+    commitment, not an accident. The only entry below is the test runner,
+    which never reaches a consumer's classpath.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <!-- Keep the existing Eclipse layout: no src/main/java, no src/test/java. -->
+    <sourceDirectory>src</sourceDirectory>
+    <testSourceDirectory>test</testSourceDirectory>
+
+    <resources>
+      <!-- No resources live under src/ today; ship the legal files inside the
+           jar under META-INF, which is what Apache-2.0 §4(d) expects. -->
+      <resource>
+        <directory>${project.basedir}</directory>
+        <targetPath>META-INF</targetPath>
+        <includes>
+          <include>LICENSE</include>
+          <include>NOTICE</include>
+        </includes>
+      </resource>
+    </resources>
+
+    <plugins>
+
+      <!-- Fail early and clearly if someone builds with a JDK older than 21. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven.enforcer.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-build-environment</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                  <message>jOpenAgent must be built with JDK 21 or newer.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.8.0,)</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven.compiler.plugin.version}</version>
+        <configuration>
+          <!-- Load-bearing: parameter names must reach the bytecode. -->
+          <parameters>true</parameters>
+          <compilerArgs>
+            <arg>${jopenagent.addModules}</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.plugin.version}</version>
+        <configuration>
+          <!-- CODE_ACT tests really do run generated Java through JShell. -->
+          <argLine>${jopenagent.addModules}</argLine>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>${maven.jar.plugin.version}</version>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <!-- No module-info.java (yet): a stable automatic module name
+                   lets JPMS consumers `requires org.jopenagent;` today. -->
+              <Automatic-Module-Name>org.jopenagent</Automatic-Module-Name>
+              <Implementation-Title>${project.name}</Implementation-Title>
+              <Implementation-Version>${project.version}</Implementation-Version>
+              <Implementation-Vendor>ILM Informatique</Implementation-Vendor>
+              <Specification-Title>${project.name}</Specification-Title>
+              <Specification-Version>${project.version}</Specification-Version>
+            </manifestEntries>
+            <manifest>
+              <addDefaultImplementationEntries>false</addDefaultImplementationEntries>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- Central requires a -sources.jar. It is also the point of this project:
+           the framework is meant to be read. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>${maven.source.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Central requires a -javadoc.jar. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven.javadoc.plugin.version}</version>
+        <configuration>
+          <source>21</source>
+          <notimestamp>true</notimestamp>
+          <!-- Keep doclint on for real problems, minus two groups the
+               vendored org.jopenkit.json (derived from the Android Open
+               Source Project) cannot satisfy without being rewritten:
+                 -missing  no @param/@return on every legacy member
+                 -html     pre-HTML5 markup, e.g. <a name="...">
+               Set this to `none` if a future JDK turns some new doclint
+               check into a release blocker. -->
+          <doclint>all,-missing,-html</doclint>
+          <failOnWarnings>false</failOnWarnings>
+          <!-- AOSP's @hide marker: recognised, and dropped from the output. -->
+          <tags>
+            <tag>
+              <name>hide</name>
+              <placement>X</placement>
+            </tag>
+          </tags>
+          <additionalOptions>
+            <additionalOption>${jopenagent.addModules}</additionalOption>
+          </additionalOptions>
+          <windowtitle>jOpenAgent ${project.version} API</windowtitle>
+          <doctitle>jOpenAgent ${project.version} API</doctitle>
+          <bottom><![CDATA[Copyright &#169; 2026 ILM Informatique. Licensed under the Apache License 2.0.]]></bottom>
+        </configuration>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+  <profiles>
+
+    <!--
+      Release profile: GPG-signs every artifact and uploads the bundle to the
+      Central Portal.  Activated explicitly:  mvn clean deploy -Prelease
+    -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>${maven.gpg.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <!-- Never prompt for the passphrase: it comes from
+                       settings.xml (gpg.passphrase) or the agent. -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>${central.publishing.plugin.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <!-- Must match the <server><id> in ~/.m2/settings.xml -->
+              <publishingServerId>central</publishingServerId>
+              <!-- `automatic` publishes as soon as validation passes.
+                   Use `user_managed` to review the deployment in the Portal
+                   UI and click Publish yourself, which is the safer default
+                   for a first-ever release. -->
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
+          </plugin>
+
+        </plugins>
+      </build>
+    </profile>
+
+    <!--
+      Convenience profile: skip the tests that spawn real subprocesses
+      (out-of-process sandbox, MCP stdio servers) on machines where process
+      creation is restricted.   mvn verify -Pno-subprocess-tests
+    -->
+    <profile>
+      <id>no-subprocess-tests</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <excludes>
+                <exclude>**/OutOfProcessCodeSandboxTest.java</exclude>
+                <exclude>**/McpClientTest.java</exclude>
+                <exclude>**/TextSkillScriptTest.java</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+  </profiles>
+
+</project>

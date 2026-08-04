@@ -1,0 +1,28 @@
+# jOpenAgent has zero runtime dependencies, so there is deliberately nothing for
+# Dependabot to bump in the `maven` ecosystem except the test runner and the
+# build plugins. Keeping GitHub Actions pinned and current is the real win here.
+version: 2
+updates:
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "build"
+    labels:
+      - dependencies
+      - build
+    # A runtime dependency must never be added by a bot. If one ever appears
+    # here, the pull request is wrong by construction, not the version.
+    open-pull-requests-limit: 5

@@ -1,0 +1,18 @@
+blank_issues_enabled: false
+contact_links:
+
+  - name: Documentation
+    url: https://www.jopenagent.org/docs.html
+    about: The full manual, quickstart and examples.
+
+  - name: Questions and ideas
+    url: https://github.com/openconcerto/jOpenAgent/discussions
+    about: For usage questions and open-ended discussion, rather than a bug report.
+
+  - name: Report a security vulnerability
+    url: https://github.com/openconcerto/jOpenAgent/security/advisories/new
+    about: Never open a public issue for a security problem. Report it privately here.
+
+  - name: Design rationale
+    url: https://github.com/openconcerto/jOpenAgent/blob/main/DESIGN_NOTES.md
+    about: Why jOpenAgent diverges from NOOA where it does, before you propose changing it.

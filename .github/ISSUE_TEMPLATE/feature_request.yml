@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a capability jOpenAgent does not have
+labels: [enhancement]
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        Please read the non-negotiables in
+        [CONTRIBUTING.md](https://github.com/openconcerto/jOpenAgent/blob/main/CONTRIBUTING.md)
+        first. In short: zero runtime dependencies, no proxies or bytecode generation,
+        no annotation processors, no lambdas, JDK 21 without preview features.
+
+        A proposal that needs a third-party library needs a smaller design instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that jOpenAgent makes hard or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: Sketch what the code would look like from a user's point of view.
+      render: java
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including whether this can already be done by composing what exists.
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This can be implemented with the JDK alone, with no new dependency
+          required: true
+        - label: This does not require the user to run an annotation processor or build plugin
+          required: true

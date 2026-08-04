@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: JDK ${{ matrix.java }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The framework spawns real subprocesses (out-of-process sandbox, MCP
+        # stdio servers, skill scripts) and its process-launch helper has a
+        # Windows-specific path, so all three OSes are genuinely load-bearing.
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        java: [ '21', '25' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Build and test
+        run: mvn -B -ntp clean verify
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.os }}-jdk${{ matrix.java }}
+          path: target/surefire-reports/
+          retention-days: 7
+
+  # A consumer's first contact with jOpenAgent is `javac -cp jopenagent.jar`
+  # with no build tool at all. That path is part of the product, so it is tested.
+  no-build-tool:
+    name: Plain javac / java (no build tool)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Package
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Compile an agent against the jar alone
+        run: |
+          JAR=$(ls target/jopenagent-*.jar | grep -v -e sources -e javadoc | head -1)
+          echo "Using $JAR"
+          mkdir -p /tmp/smoke
+          cat > /tmp/smoke/SmokeAgent.java <<'EOF'
+          import org.jopenagent.core.Agent;
+          import org.jopenagent.core.AgentConfig;
+          import org.jopenagent.core.Generative;
+          import org.jopenagent.core.SystemPrompt;
+
+          @SystemPrompt("You are a smoke test.")
+          public class SmokeAgent extends Agent {
+              public SmokeAgent(AgentConfig config) { super(config); }
+
+              @Generative("Say hello.")
+              public String hello(String name) { return generate(name); }
+
+              public static void main(String[] args) {
+                  System.out.println("jOpenAgent on the classpath, no build tool, no dependencies.");
+              }
+          }
+          EOF
+          javac -parameters -cp "$JAR" -d /tmp/smoke /tmp/smoke/SmokeAgent.java
+          java --add-modules jdk.jshell -cp "/tmp/smoke:$JAR" SmokeAgent
+
+      - name: Assert the jar has no transitive dependencies
+        run: |
+          COUNT=$(mvn -B -ntp dependency:list -DincludeScope=runtime -DoutputFile=/tmp/deps.txt >/dev/null && grep -cE '^\s+[a-z].*:(compile|runtime)$' /tmp/deps.txt || true)
+          echo "Runtime dependencies found: ${COUNT:-0}"
+          if [ "${COUNT:-0}" -ne 0 ]; then
+            echo "::error::jOpenAgent must ship zero runtime dependencies."
+            cat /tmp/deps.txt
+            exit 1
+          fi
+
+  # Proves the release path works before a tag is ever pushed: the javadoc jar
+  # is the single most common reason a Maven Central deployment gets rejected.
+  release-artifacts:
+    name: Release artifacts (sources + javadoc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build jar, sources and javadoc
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jopenagent-artifacts
+          path: target/*.jar
+          retention-days: 7
