@@ -1,6 +1,7 @@
 package org.jopenagent.core.strategy;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.jopenkit.json.JSONArray;
@@ -25,6 +26,7 @@ import org.jopenagent.llm.ToolSpec;
 import org.jopenagent.llm.media.Media;
 import org.jopenagent.sandbox.CodeExecutor;
 import org.jopenagent.sandbox.CodeSandbox;
+import org.jopenagent.sandbox.CodeValidator;
 import org.jopenagent.sandbox.SandboxConfig;
 import org.jopenagent.sandbox.SandboxMode;
 import org.jopenagent.sandbox.SandboxResult;
@@ -74,7 +76,7 @@ public final class CodeActStrategy implements Strategy {
         Agent agent = ctx.getAgent();
         LlmClient llm = agent.getLlmClient();
 
-        String systemPrompt = PromptBuilder.systemPrompt(agent) + "\n\n" + codeActInstructions(agent);
+        String systemPrompt = PromptBuilder.systemPrompt(agent) + "\n\n" + codeActInstructions(agent, ctx);
         String taskPrompt = PromptBuilder.taskPrompt(ctx);
 
         List<Media> media = PromptBuilder.collectMedia(ctx);
@@ -114,7 +116,7 @@ public final class CodeActStrategy implements Strategy {
                     }
                     if (call.getName().equals(EXECUTE_TOOL)) {
                         String code = call.getArguments().optString("code", "");
-                        SandboxResult result = runInSandbox(sandbox, code, iteration);
+                        SandboxResult result = runInSandbox(sandbox, code, iteration, ctx.getMethod().getName());
                         transcript.append("executed: ").append(code).append(" -> ").append(result.getStatus()).append("\n");
                         conversation.add(LlmMessage.toolResult(call.getId(), result.describe()));
                         continue;
@@ -134,9 +136,22 @@ public final class CodeActStrategy implements Strategy {
         return new CodeSandbox(agent, config.getTimeoutMillis());
     }
 
-    private SandboxResult runInSandbox(CodeExecutor sandbox, String code, int iteration) {
+    private SandboxResult runInSandbox(CodeExecutor sandbox, String code, int iteration, String activeMethod) {
         Span span = Traced.begin("code_execution", "iteration " + iteration);
-        SandboxResult result = sandbox.execute(code);
+        SandboxResult result;
+        if (CodeValidator.referencesSelfMethod(code, activeMethod)) {
+            // NOOA only *warns* against calling the active generative method (see the task message
+            // in nooa/src/nooa/strategies/codeact.py, "would recurse"); blocking it outright is a
+            // deliberate divergence (DESIGN_NOTES.md section 23): a nested CODE_ACT run inside a
+            // JShell eval does its own LLM calls, which the in-process watchdog's cooperative
+            // jshell.stop() cannot preempt, so a small model that ignores the warning would turn
+            // one bad call into a timeout instead of a recoverable tool error.
+            result = SandboxResult.rejected(Collections.singletonList(
+                    "Code references self." + activeMethod + "(...), the generative method currently executing; calling it would recursively "
+                            + "re-enter this generation. Use the other methods on self to compute the result, then call " + RETURN_RESULT_TOOL + "."));
+        } else {
+            result = sandbox.execute(code);
+        }
         if (span != null) {
             span.setAttribute("status", result.getStatus().name());
             span.setAttribute("code", code);
@@ -167,10 +182,18 @@ public final class CodeActStrategy implements Strategy {
                 schema);
     }
 
-    private String codeActInstructions(Agent agent) {
+    private String codeActInstructions(Agent agent, CallContext ctx) {
+        // The anti-recursion sentence mirrors NOOA's task-message warning ("You are executing
+        // `X` — Calling `self.X(...)` would recurse.", nooa/src/nooa/strategies/codeact.py):
+        // describe() lists every generative method including the one currently executing, so
+        // without it the prompt reads as an invitation to call self.<activeMethod>(...).
+        String activeMethod = ctx.getMethod().getName();
         return "You can solve this task by writing and executing Java code via the " + EXECUTE_TOOL + " tool. A variable `self` of type "
                 + agent.getClass().getSimpleName() + " is bound in the execution environment; call its visible methods directly, e.g. self.someMethod(...). "
-                + "Available API on self:\n" + agent.describe() + "\nWhen you have the final answer, call " + RETURN_RESULT_TOOL
+                + "Available API on self:\n" + agent.describe()
+                + "\nYou are executing `" + activeMethod + "` — calling self." + activeMethod + "(...) from generated code would recurse and is blocked; "
+                + "compute the result with the other methods on self instead."
+                + "\nWhen you have the final answer, call " + RETURN_RESULT_TOOL
                 + " (do not just print it or return it from execute_java).";
     }
 

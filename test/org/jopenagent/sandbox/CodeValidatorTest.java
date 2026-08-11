@@ -50,6 +50,30 @@ class CodeValidatorTest {
     }
 
     @Test
+    void blocksQualifiedPrefixEvenWithWhitespaceAroundDots() {
+        CodeValidator.ValidationResult result = CodeValidator.validate("java . lang . Runtime . getRuntime ( ) ;");
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void referencesSelfMethodDetectsDirectCall() {
+        assertTrue(CodeValidator.referencesSelfMethod("int t = self.totalPriceViaCode();", "totalPriceViaCode"));
+        assertTrue(CodeValidator.referencesSelfMethod("self . totalPriceViaCode ( )", "totalPriceViaCode"));
+    }
+
+    @Test
+    void referencesSelfMethodIgnoresOtherMethodsAndOtherReceivers() {
+        assertFalse(CodeValidator.referencesSelfMethod("int p = self.unitPriceCents(\"X\");", "totalPriceViaCode"));
+        assertFalse(CodeValidator.referencesSelfMethod("int t = other.totalPriceViaCode();", "totalPriceViaCode"));
+    }
+
+    @Test
+    void referencesSelfMethodIgnoresStringLiteralsAndComments() {
+        assertFalse(CodeValidator.referencesSelfMethod("String s = \"self.totalPriceViaCode()\";", "totalPriceViaCode"));
+        assertFalse(CodeValidator.referencesSelfMethod("// self.totalPriceViaCode()\nint x = 1;", "totalPriceViaCode"));
+    }
+
+    @Test
     void doesNotFlagIdentifiersThatMerelyContainBlockedNamesAsSubstrings() {
         CodeValidator.ValidationResult result = CodeValidator.validate("String myFileName = \"data.txt\"; System.out.println(myFileName);");
         // "myFileName" is a distinct identifier token from "File"/"System" and must not match.

@@ -63,9 +63,28 @@ public final class CodeValidator {
         return new ValidationResult(violations);
     }
 
+    /**
+     * True if {@code source} references {@code self.<methodName>} anywhere outside string/char
+     * literals and comments. Used by the {@code CODE_ACT} strategy to block generated code from
+     * calling the generative method it is itself implementing, which would recursively re-enter
+     * the generation loop (see DESIGN_NOTES.md section 23). Reuses the same tokenizer as
+     * {@link #validate(String)}, so a mention inside a string literal does not false-positive.
+     */
+    public static boolean referencesSelfMethod(String source, String methodName) {
+        for (List<String> chain : extractDottedChains(source)) {
+            for (int i = 0; i + 1 < chain.size(); i++) {
+                if (chain.get(i).equals("self") && chain.get(i + 1).equals(methodName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static List<List<String>> extractDottedChains(String source) {
         List<List<String>> chains = new ArrayList<>();
         List<String> current = new ArrayList<>();
+        boolean pendingDot = false;
         int i = 0;
         int len = source.length();
         while (i < len) {
@@ -97,13 +116,30 @@ public final class CodeValidator {
                     i++;
                 }
                 current.add(source.substring(start, i));
+                pendingDot = false;
                 continue;
             }
             if (c == '.') {
+                pendingDot = true;
                 i++;
                 continue;
             }
+            if (Character.isWhitespace(c)) {
+                // `a . b` is the same dotted chain as `a.b`: whitespace only ends a chain when it
+                // is not adjacent to a '.' on either side, otherwise `java . lang . Runtime`
+                // would evade the qualified-prefix denylist.
+                int j = i;
+                while (j < len && Character.isWhitespace(source.charAt(j))) {
+                    j++;
+                }
+                if (!pendingDot && !(j < len && source.charAt(j) == '.')) {
+                    flush(chains, current);
+                }
+                i = j;
+                continue;
+            }
             flush(chains, current);
+            pendingDot = false;
             i++;
         }
         flush(chains, current);

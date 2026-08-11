@@ -158,7 +158,9 @@ public final class SandboxWorkerMain {
                 } else if (event.exception() != null) {
                     hasError = true;
                     messages.add(describeException(event.exception()));
-                } else if (event.value() != null) {
+                } else if (event.value() != null && !event.value().isEmpty()) {
+                    // See CodeSandbox.execute(): statement snippets report "" rather than null,
+                    // and must not clobber the last real expression value.
                     lastValue = event.value();
                 }
             }

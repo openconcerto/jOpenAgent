@@ -43,6 +43,33 @@ class CodeActStrategyTest {
     }
 
     @Test
+    void generatedCodeCallingTheActiveGenerativeMethodIsRejectedBeforeExecution() {
+        MockLlmClient llm = new MockLlmClient();
+
+        // If this code actually reached JShell, the nested doubleBacklogViaCode() call would
+        // re-enter the CodeAct loop and drain the mock's queue, so the test passing at all
+        // proves the guard short-circuited before execution.
+        JSONObject recursiveArgs = new JSONObject();
+        recursiveArgs.put("code", "int total = self.doubleBacklogViaCode(); System.out.println(total);");
+        llm.enqueueToolCall(new ToolCall("call-1", "execute_java", recursiveArgs));
+
+        JSONObject returnArgs = new JSONObject();
+        returnArgs.put("value", 84);
+        llm.enqueueToolCall(new ToolCall("call-2", "return_result", returnArgs));
+
+        SupportAgent agent = new SupportAgent(AgentConfig.builder().llmClient(llm).build());
+
+        int result = agent.doubleBacklogViaCode();
+
+        assertEquals(84, result);
+        String systemPrompt = llm.getRequests().get(0).getSystemPrompt();
+        assertTrue(systemPrompt.contains("You are executing `doubleBacklogViaCode`"), systemPrompt);
+        String toolResultFedBack = llm.getRequests().get(1).getMessages().get(llm.getRequests().get(1).getMessages().size() - 1).getContent();
+        assertTrue(toolResultFedBack.contains("REJECTED"), toolResultFedBack);
+        assertTrue(toolResultFedBack.contains("recursively"), toolResultFedBack);
+    }
+
+    @Test
     void outOfProcessSandboxModeExecutesGeneratedCodeInAChildJvmViaTheStrategy() {
         MockLlmClient llm = new MockLlmClient();
 

@@ -140,7 +140,10 @@ public final class CodeSandbox implements CodeExecutor {
             } else if (event.exception() != null) {
                 hasError = true;
                 messages.add(describeException(event.exception()));
-            } else if (event.value() != null) {
+            } else if (event.value() != null && !event.value().isEmpty()) {
+                // Statement snippets (including a trailing top-level `return x;`, which JShell
+                // compiles as a plain statement and discards the value of) report "" rather than
+                // null; letting them through would clobber the last real expression value.
                 lastValue = event.value();
             }
         }
