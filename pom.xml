@@ -88,7 +88,7 @@
          classpath code, at compile time, test time and javadoc time. -->
     <jopenagent.addModules>--add-modules=jdk.jshell</jopenagent.addModules>
 
-    <junit.version>5.11.4</junit.version>
+    <junit.version>6.1.3</junit.version>
 
     <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
     <maven.surefire.plugin.version>3.5.6</maven.surefire.plugin.version>
