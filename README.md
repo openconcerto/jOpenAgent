@@ -10,10 +10,10 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://adoptium.net/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#zero-dependencies-is-a-commitment-not-an-accident)
 
-[Website](https://www.jopenagent.org/) ·
-[Quickstart](https://www.jopenagent.org/quickstart.html) ·
-[Examples](https://www.jopenagent.org/examples.html) ·
-[Docs](https://www.jopenagent.org/docs.html) ·
+[Website](https://www.jopenagent.com/) ·
+[Quickstart](https://www.jopenagent.com/quickstart.html) ·
+[Examples](https://www.jopenagent.com/examples.html) ·
+[Docs](https://www.jopenagent.com/docs.html) ·
 
 
 </div>
